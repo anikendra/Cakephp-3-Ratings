@@ -384,9 +384,10 @@ class RatingHelper extends Helper {
 
 		$script = <<<HTML
 <script>
-;(function($) {
-	$(function() {
-		$('#$id').raty({
+// ;(function($) {
+	// $(function() {
+	function initRatings() {
+		$('#$id').stars({
 			starType: 'i',
 			space: false,
 			scoreName: 'rating',
@@ -394,11 +395,12 @@ class RatingHelper extends Helper {
 				return $(this).attr('data-rating');
 			}
 		});
-	});
-})(jQuery);
+	}
+	// });
+// })(jQuery);
 </script>
 HTML;
-
+		// echo $script;die;
 		$this->_View->Blocks->concat('script', $script);
 
 		return $stars;
@@ -413,30 +415,48 @@ HTML;
 	 * @return string
 	 */
 	public function bar($value, $total, array $options = []) {
-		$defaultOptions = [
-			'innerClass' => 'inner',
-			'innerHtml' => '<span>%value%</span>',
-			'innerOptions' => [],
-			'outerClass' => 'barRating',
-			'outerOptions' => [],
-			'element' => null];
-		$options += $defaultOptions;
+		if($value > 0) {
+			switch(ceil($value)) {
+				case 5:
+				$class = 'fivestar';
+				break;
+				case 4:
+				$class = 'fourstar';
+				break;
+				case 3:
+				$class = 'threestar';
+				break;
+				case 2: 
+				$class = 'twostar';
+				break; 
+				default:
+				$class = 'onestar';
+			}
+			$defaultOptions = [
+				'innerClass' => 'inner '.$class,
+				'innerHtml' => '<span>%value%</span>',
+				'innerOptions' => [],
+				'outerClass' => 'barRating',
+				'outerOptions' => [],
+				'element' => null];
+			$options += $defaultOptions;
 
-		$percentage = $this->percentage($value, $total);
+			$percentage = $this->percentage($value, $total);
 
-		if (!empty($options['element'])) {
-			return $this->_View->element($options['element'], [
-				'value' => $value,
-				'percentage' => $percentage,
-				'total' => $total]);
+			if (!empty($options['element'])) {
+				return $this->_View->element($options['element'], [
+					'value' => $value,
+					'percentage' => $percentage,
+					'total' => $total]);
+			}
+
+			$options['innerOptions']['style'] = 'width: ' . $percentage . '%';
+			$innerContent = str_replace('%value%', $value, $options['innerHtml']);
+			$innerContent = str_replace('%percentage%', $percentage, $innerContent);
+			$inner = $this->Html->div($options['innerClass'], $innerContent, $options['innerOptions']);
+
+			return $this->Html->div($options['outerClass'], $inner, $options['outerOptions']);
 		}
-
-		$options['innerOptions']['style'] = 'width: ' . $percentage . '%';
-		$innerContent = str_replace('%value%', $value, $options['innerHtml']);
-		$innerContent = str_replace('%percentage%', $percentage, $innerContent);
-		$inner = $this->Html->div($options['innerClass'], $innerContent, $options['innerOptions']);
-
-		return $this->Html->div($options['outerClass'], $inner, $options['outerOptions']);
 	}
 
 	/**
@@ -479,6 +499,7 @@ HTML;
 		}
 
 		$inputOptions = [
+			'label' => $options['label'] ? $options['label'] : false,
 			'type' => in_array($options['type'], ['radio', 'select']) ? $options['type'] : 'radio',
 			'id' => 'starelement_' . $id,
 			'value' => isset($options['value']) ? round($options['value']) : 0,
@@ -497,7 +518,7 @@ HTML;
 				$result .= $this->Js->submit(__d('ratings', 'Rate!'), array_merge(['url' => $options['createForm']['url']], $options['createForm']['ajaxOptions'])) . "\n";
 				$flush = true;
 			} else {
-				$result .= $this->Form->submit(__d('ratings', 'Rate!')) . "\n";
+				$result .= $this->Form->button('Rate', ['type' => 'submit', 'class' => 'btn btn-xs btn-success']);
 			}
 			$result .= $this->Form->end() . "\n";
 
@@ -507,32 +528,24 @@ HTML;
 			} else {
 				$split = 1;
 			}
-			if ($options['js']) {
-			/*
-			$this->Js->buffer('
-			$("#star_' . $id . '").stars({
-				cancelValue: 0,
-				inputType: "select",
-				split:' . $split . ',
-				cancelShow: true,
-					'.(!$disabled ? 'captionEl: $("#cap_' . $id . '"),' : '').'
-					callback: function(ui, type, value) {
-						' . (isset($callback) ? $callback . '("star_' . $id . '");' : '') . '
-					}
-			}); eval();
-	');
-		*/
-		$result .= '<script>$(document).ready(function () {
-$("#star_' . $id . '").stars({
-	cancelValue: 0,
-	inputType: "' . $inputOptions['type'] . '",
-	split:1,
-	cancelShow: true,
-	captionEl: $("#cap_' . $id . '"),
-	callback: function(ui, type, value) {
-	' . (isset($options['callback']) ? ($options['callback'] . PHP_EOL) : '') . '}
-	});
-});</script>';
+			if ($options['js']) {			
+				$result .=	'<script>function initRatings() {
+								$("#star_' . $id . '").barrating({
+						        theme: "fontawesome-stars"
+						      });
+						      $(".rating .btn").on("click",function(e) {
+						      	e.preventDefault();
+						      	var form = $(".ratings form");
+						      	var data = form.serialize();
+					            var url = form.prop("action");
+					            var d = $.Deferred();
+					            main.TourCupid.makeRequest(url, "POST", data, d).then(function (data) {
+					                if(data.result.success) {
+					                    document.location.reload();
+					                }
+					            });
+						      })
+						  	}';
 			}
 
 			if ($flush) {

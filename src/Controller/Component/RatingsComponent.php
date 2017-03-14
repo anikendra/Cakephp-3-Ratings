@@ -82,10 +82,14 @@ class RatingsComponent extends Component {
 
 		$params = $this->request->data + $this->request->query + $this->_config['params'];
 
+		$cookie = $_COOKIE['nativeUser'];
+        if(!empty($cookie)) {
+            $cookieVal = json_decode($cookie,true);
+        }
 		if (!method_exists($this->Controller, 'rate')) {
 			if (isset($params['rate']) && isset($params['rating'])) {
-				$userId = $this->config('userId') ?: $this->Controller->Auth->user($this->config('userIdField'));
-				return $this->rate($params['rate'], $params['rating'], $userId, $params['redirect']);
+				$userId = $this->config('userId') ?: $cookieVal['id'];
+				$result = $this->rate($params['rate'], $params['rating'], $userId, $params['redirect']);				
 			}
 		}
 	}
@@ -104,29 +108,31 @@ class RatingsComponent extends Component {
 
 		if (!$user) {
 			$message = __d('ratings', 'Not logged in');
-			$status = 'error';
+			$success = false;
 		} elseif ($Controller->{$this->config('modelName')}->findById($rate)) {
 			if ($newRating = $Controller->{$this->config('modelName')}->saveRating($rate, $user, $rating)) {
 				$rating = round($newRating->newRating);
 				$message = __d('ratings', 'Your rate was successful.');
-				$status = 'success';
+				$success = true;
 			} else {
 				$message = __d('ratings', 'You have already rated.');
-				$status = 'error';
+				$success = true;
 			}
 		} else {
 			$message = __d('ratings', 'Invalid rate.');
-			$status = 'error';
+			$success = false;
 		}
-		$result = compact('status', 'message', 'rating');
-		$this->Controller->set($result);
-		if ($redirect) {
+		$type = 'redirect';
+		$redirect = Router::url(NULL, true); 
+		$result = compact('success', 'message', 'rating', 'type', 'redirect');
+		echo json_encode(array('result'=>$result));die;
+		// return $result;				
+		/*if ($redirect) {
 			if ($redirect === true) {
 				return $this->redirect($this->buildUrl());
 			}
 			return $this->redirect($redirect);
-		}
-		return $result;
+		}*/
 	}
 
 	/**
